@@ -1,0 +1,9 @@
+# requirements.txt
+fastapi
+uvicorn
+opencv-python-headless
+numpy
+scikit-learn
+kneed
+pillow
+python-multipart
