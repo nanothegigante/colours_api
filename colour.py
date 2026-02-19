@@ -14,13 +14,17 @@ def optimal_k(data, kmin=2, kmax=10):
         sse.append(km.inertia_)
 
     kl = KneeLocator(ks, sse, curve="convex", direction="decreasing")
-    if kl.knee is not None:
-        return int(kl.knee)
-    return int(kmin)
+    return int(kl.knee) if kl.knee is not None else int(kmin)
+    # if kl.knee is not None:
+    #     return int(kl.knee)
+    # return int(kmin)
 
 
 def image_to_base64(img):
-    _, buffer = cv2.imencode(".png", img)
+    ok, buffer = cv2.imencode(".png", img)
+    if not ok:
+        raise ValueError("Failed to encode image as PNG")
+    # _, buffer = cv2.imencode(".png", img)
     return base64.b64encode(buffer).decode("utf-8")
 
 
@@ -31,6 +35,7 @@ def extract_dominant_colours(
     kmin=2,
     kmax=10,
     resize_width=400,
+    include_masks: bool = False, # added in 260219
 ):
     # resize
     h, w = img_bgr.shape[:2]
@@ -45,6 +50,8 @@ def extract_dominant_colours(
     # クラスタ数決定
     if mode == "auto":
         k = optimal_k(pixels, kmin=kmin, kmax=kmax)
+
+    k = int(k)  # Ensure k is an integer
 
     # KMeans
     km = KMeans(n_clusters=k, random_state=0, n_init=10)
@@ -65,16 +72,31 @@ def extract_dominant_colours(
         rgb = (int(bgr[2]), int(bgr[1]), int(bgr[0]))
         hex_code = "#{:02X}{:02X}{:02X}".format(*rgb)
 
-        # パーティション画像
-        part = np.ones_like(img) * 255
-        mask = labels_img == i
-        part[mask] = img[mask]
-
-        results.append({
+        item = {
+            "id": int(i),
             "hex": hex_code,
             "ratio": float(ratios[i]),
-            "mask_image": image_to_base64(part),
-        })
+        }
+
+        #必要な時だけマスク生成
+        if include_masks:
+            part = np.ones_like(img) * 255
+            mask = labels_img == i
+            part[mask] = img[mask]
+            item["mask_image"] = image_to_base64(part)
+
+        results.append(item)
+
+        # # パーティション画像
+        # part = np.ones_like(img) * 255
+        # mask = labels_img == i
+        # part[mask] = img[mask]
+
+        # results.append({
+        #     "hex": hex_code,
+        #     "ratio": float(ratios[i]),
+        #     "mask_image": image_to_base64(part),
+        # })
 
     # 面積順にソート
     results.sort(key=lambda x: x["ratio"], reverse=True)

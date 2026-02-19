@@ -1,12 +1,12 @@
 # main.py
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.encoders import jsonable_encoder
+# from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 import numpy as np
 import cv2
 from colour import extract_dominant_colours
-from typing import Optional
+from typing import Optional, Any
 import traceback
 
 app = FastAPI(title="Dominant Colour API")
@@ -20,11 +20,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/extract")
+def to_py(obj: Any):
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {str(k): to_py(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_py(x) for x in obj]
+    return obj
+
+
+@app.post("/extract", response_class=JSONResponse)
 async def extract(
     file: UploadFile = File(...),
     mode: str = Form("auto"),  # "auto" or "manual"
-    k: Optional[str] = Form(None)
+    k: Optional[str] = Form(None),
+    include_masks: bool = Form(False),  # added in 260219
 ):
     try:
         # kをパース（空文字やnoneはnone扱い）
@@ -36,6 +51,7 @@ async def extract(
                     k_int = int(k)
                 except ValueError:
                     raise HTTPException(status_code=422, detail="k must be an integer")
+                
         if mode == "manual" and k_int is None:
             raise HTTPException(status_code=400, detail="k must be provided in manual mode")
         
@@ -49,17 +65,21 @@ async def extract(
             img_bgr=img_bgr,
             mode=mode,
             k=(k_int if k_int is not None else 5),  # デフォルトは5
+            include_masks=include_masks,
         )
 
-        content = jsonable_encoder(
-            result,
-            custom_encoder={
-                np.integer: int,
-                np.floating: float,
-                np.ndarray: lambda x: x.tolist()
-            },
-        )
-        return JSONResponse(content=content)
+        return JSONResponse(content=to_py(result))
+    
+
+        # content = jsonable_encoder(
+        #     result,
+        #     custom_encoder={
+        #         np.integer: int,
+        #         np.floating: float,
+        #         np.ndarray: lambda x: x.tolist()
+        #     },
+        # )
+        # return JSONResponse(content=content)
     
     except HTTPException:
         raise
