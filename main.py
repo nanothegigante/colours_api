@@ -40,6 +40,7 @@ async def extract(
     mode: str = Form("auto"),  # "auto" or "manual"
     k: Optional[str] = Form(None),
     include_masks: bool = Form(False),  # added in 260219
+    mask_resize_width: int = Form(200),  # added in 260224
 ):
     try:
         # kをパース（空文字やnoneはnone扱い）
@@ -61,11 +62,19 @@ async def extract(
         if img_bgr is None:
             raise HTTPException(status_code=400, detail="Invalid decoding failed")
         
+        mask_resize_width = int(mask_resize_width)
+        if mask_resize_width < 64:
+            mask_resize_width = 64
+        if mask_resize_width > 800:
+            mask_resize_width = 800
+
+
         result = extract_dominant_colours(
             img_bgr=img_bgr,
             mode=mode,
             k=(k_int if k_int is not None else 5),  # デフォルトは5
             include_masks=include_masks,
+            mask_resize_width=mask_resize_width,
         )
 
         return JSONResponse(content=to_py(result))
