@@ -14,7 +14,7 @@ app = FastAPI(title="Dominant Colour API")
 # フロント（Vercel）から叩けるようにCORS許可
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 本番ではドメイン限定可
+    allow_origins=["https://colours-delta.vercel.app"],  # 本番ではドメイン限定可
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
